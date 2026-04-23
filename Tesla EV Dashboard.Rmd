@@ -1,0 +1,232 @@
+---
+title: "Tesla EV Dashboard"
+output:
+  flexdashboard::flex_dashboard:
+    orientation: rows
+    vertical_layout: fill
+    theme: cosmo
+---
+
+---
+
+title: "Tesla EV Dashboard"
+output:
+flexdashboard::flex_dashboard:
+orientation: columns
+vertical_layout: fill
+theme: cosmo
+------------
+
+```{r setup, include=FALSE}
+library(dplyr)
+library(tidyr)
+library(ggplot2)
+library(scales)
+library(flexdashboard)
+
+theme_set(
+  theme_minimal() +
+    theme(
+      plot.title = element_text(color = "#0B3C5D", size = 14, face = "bold"),
+      axis.text = element_text(color = "#333333")
+    )
+)
+```
+
+```{r data}
+# LOAD DATA
+df <- read.csv("C:/Users/iyanu/Downloads/LEARNING DATA ANALYTICS/Learning R with Alex/Final Project/Files/Electric_Vehicle_Population_Data.csv")
+
+# CLEAN
+clean_df <- df %>%
+  rename_all(~ gsub("\\.","_", .)) %>%
+  mutate(
+    Tesla = ifelse(Make == "TESLA", "TESLA", "OTHER"),
+    Base_MSRP = as.numeric(Base_MSRP)
+  )
+
+# KPIs
+total_vehicles <- nrow(clean_df)
+
+tesla_vehicles <- clean_df %>%
+  filter(Tesla == "TESLA") %>%
+  nrow()
+
+tesla_market_share <- round(tesla_vehicles / total_vehicles * 100, 1)
+
+# MARKET SHARE
+market_df <- data.frame(
+  Group = c("TESLA", "OTHER"),
+  Market_Share = c(tesla_market_share, 100 - tesla_market_share)
+)
+
+# MODELS SOLD
+make_model_sold <- clean_df %>%
+  filter(Tesla == "TESLA") %>%
+  group_by(Model) %>%
+  summarise(count_sold = n(), .groups = "drop") %>%
+  arrange(desc(count_sold))
+
+# PRICING DATA
+df_tesla_prices <- read.csv("C:/Users/iyanu/Downloads/LEARNING DATA ANALYTICS/Learning R with Alex/Final Project/Files/Tesla_Current_Base_Prices.csv") %>%
+  mutate(Model = toupper(Model))
+
+Top_Tesla_Models_Priced <- make_model_sold %>%
+  left_join(df_tesla_prices, by = "Model") %>%
+  mutate(Estimated_revenue = count_sold * Base_Price_USD) %>%
+  filter(!is.na(Estimated_revenue)) %>%
+  group_by(Model) %>%
+  slice_min(Base_Price_USD) %>%
+  ungroup()
+
+# TRENDS
+tesla_sold_by_year <- clean_df %>%
+  filter(Tesla == "TESLA") %>%
+  group_by(Model_Year) %>%
+  summarise(count = n(), .groups = "drop")
+
+PHEV_vs_BEV <- clean_df %>%
+  group_by(Model_Year, Electric_Vehicle_Type) %>%
+  summarise(Count = n(), .groups = "drop")
+
+# RANGE
+Avg_Range_For_EVs <- clean_df %>%
+  filter(Electric_Vehicle_Type == "Battery Electric Vehicle (BEV)",
+         Electric_Range != 0,
+         Base_MSRP != 0) %>%
+  group_by(Tesla) %>%
+  summarise(AVG_Range = mean(Electric_Range), .groups = "drop")
+
+# UTILITIES
+Utility_Count_for_Teslas <- clean_df %>%
+  filter(Tesla == "TESLA") %>%
+  group_by(Electric_Utility) %>%
+  summarise(Count = n(), .groups = "drop") %>%
+  arrange(desc(Count)) %>%
+  head(5)
+```
+
+---
+
+# 📊 Overview
+
+## Column {data-width=350}
+
+### Total Vehicles
+
+```{r}
+valueBox(total_vehicles, icon = "fa-car", color = "primary")
+```
+
+### Tesla Market Share
+
+```{r}
+valueBox(paste0(tesla_market_share, "%"), icon = "fa-chart-pie", color = "success")
+```
+
+### Tesla Vehicles
+
+```{r}
+valueBox(tesla_vehicles, icon = "fa-bolt", color = "info")
+```
+
+---
+
+## Column
+
+### Market Share
+
+```{r}
+ggplot(market_df, aes(x = "", y = Market_Share, fill = Group)) +
+  geom_col(width = 1) +
+  coord_polar("y") +
+  scale_fill_manual(values = c("#1ABC9C", "#3498DB")) +
+  theme_void()
+```
+
+---
+
+# 🚗 Performance
+
+## Column
+
+### Models Sold
+
+```{r}
+ggplot(make_model_sold,
+       aes(x = reorder(Model, count_sold), y = count_sold)) +
+  geom_col(fill = "#3498DB") +
+  coord_flip()
+```
+
+---
+
+## Column
+
+### Revenue per Model
+
+```{r}
+ggplot(Top_Tesla_Models_Priced,
+       aes(x = reorder(Model, Estimated_revenue), y = Estimated_revenue)) +
+  geom_col(fill = "#2ECC71") +
+  coord_flip() +
+  scale_y_continuous(labels = label_comma())
+```
+
+---
+
+# 📈 Trends
+
+## Column
+
+### Tesla Sales Over Time
+
+```{r}
+ggplot(tesla_sold_by_year,
+       aes(x = Model_Year, y = count)) +
+  geom_line(color = "#3498DB") +
+  geom_point(color = "#1ABC9C")
+```
+
+---
+
+## Column
+
+### PHEV vs BEV
+
+```{r}
+ggplot(PHEV_vs_BEV,
+       aes(x = Model_Year, y = Count, color = Electric_Vehicle_Type)) +
+  geom_line() +
+  scale_color_manual(values = c("#3498DB", "#2ECC71"))
+```
+
+---
+
+# ⚡ Insights
+
+## Column
+
+### Avg Range
+
+```{r}
+ggplot(Avg_Range_For_EVs,
+       aes(x = Tesla, y = AVG_Range, fill = Tesla)) +
+  geom_col() +
+  scale_fill_manual(values = c("#2ECC71", "#3498DB"))
+```
+
+---
+
+## Column
+
+### Top Utilities
+
+```{r}
+ggplot(Utility_Count_for_Teslas,
+       aes(x = reorder(Electric_Utility, Count), y = Count)) +
+  geom_col(fill = "#1ABC9C") +
+  coord_flip()
+```
+
+```
