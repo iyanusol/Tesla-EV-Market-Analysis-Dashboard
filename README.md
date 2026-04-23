@@ -4,7 +4,8 @@ This project presents an end-to-end analysis of Tesla’s electric vehicle perfo
 
 ---
 
-
+### 🧠 Overall Dashboard
+![Dashboard Overview](https://raw.githubusercontent.com/iyanusol/Tesla-EV-Market-Analysis-Dashboard/main/images/graph%20sample.png)
 ## 📊 Overview
 
 The dashboard highlights key business questions:
@@ -34,7 +35,25 @@ The output is a structured dashboard designed to communicate insights clearly an
 - Cleaned column names for consistency  
 - Standardized categorical variables  
 - Converted numeric fields (e.g., MSRP) for analysis  
-- Created derived fields such as Tesla vs Other segmentation  
+- Created derived fields such as Tesla vs Other segmentation
+
+![Models Sold](https://raw.githubusercontent.com/iyanusol/Tesla-EV-Market-Analysis-Dashboard/main/images/output-1.png)
+
+```
+make_model_sold <- clean_df  %>%
+  filter(Tesla == "TESLA") %>%
+  group_by(Make, Model) %>%
+  summarise(count_sold = n(), .groups = "drop") %>%
+  arrange(desc(count_sold))
+
+
+msrp_per_year <- clean_df %>%
+  filter(Base_MSRP > 0) %>%
+  filter(Tesla == "TESLA") %>%
+  group_by(Model_Year, Make, Model) %>%
+  summarise(min(Base_MSRP)) %>%
+  arrange(Model_Year, Make, Model)
+```
 
 ### 2. Feature Engineering
 - Calculated key metrics:
@@ -44,6 +63,8 @@ The output is a structured dashboard designed to communicate insights clearly an
 - Aggregated model-level and year-level data  
 - Integrated pricing data to estimate revenue per model  
 
+![Trends](https://raw.githubusercontent.com/iyanusol/Tesla-EV-Market-Analysis-Dashboard/main/images/output-3.png)
+
 ### 3. Data Modeling
 - Grouped and summarized data across:
   - Model
@@ -52,6 +73,27 @@ The output is a structured dashboard designed to communicate insights clearly an
 - Filtered and refined datasets to focus on meaningful comparisons  
 
 ---
+```
+market_df <- data.frame(
+  Group = c("TESLA", "OTHER"),
+  Market_Share = c(tesla_market_share, 100 - tesla_market_share)
+)
+
+market_df <- market_df %>%
+  mutate(
+    Label = paste0(Market_Share, "%"),
+    ypos = cumsum(Market_Share) - 0.5 * Market_Share
+  )
+
+ggplot(market_df, aes(x = "", y = Market_Share, fill = Group)) +
+  geom_col(width = 1) +
+  coord_polar("y") +
+  geom_text (aes(y = ypos, label = Label))+
+  labs(title = "Tesla Market Share in Washington (%)")+
+  theme_void()
+
+```
+
 
 ## 📈 Dashboard Structure
 
@@ -61,18 +103,71 @@ The dashboard is organized into four sections:
 - High-level KPIs (total vehicles, Tesla share, Tesla count)  
 - Market share visualization  
 
+```
+df_tesla_prices <- df_tesla_prices %>%
+  mutate(
+    Model = toupper(Model)
+  )
+  
+
+Top_Tesla_Models_Priced <- make_model_sold %>%
+  left_join(df_tesla_prices, by = "Model") %>%
+  mutate(
+    Estimated_revenue = as.numeric(count_sold) * as.numeric(Base_Price_USD)
+  )
+
+Top_Tesla_Models_Priced <- Top_Tesla_Models_Priced %>%
+  filter(!is.na(Estimated_revenue)) %>%
+  group_by(Model) %>%
+  slice_min(Base_Price_USD) %>%
+  ungroup()
+
+
+tesla_sold_by_year <- clean_df %>%
+  filter(Tesla == "TESLA") %>%
+  group_by(Model_Year) %>%
+  summarise(count = n()) %>%
+  arrange(Model_Year)
+
+```
+
 ### Performance
 - Model-level sales distribution  
 - Estimated revenue by model  
 
+```
+Avg_Range_For_EVs <- clean_df %>%
+  filter(Electric_Vehicle_Type == "Battery Electric Vehicle (BEV)",
+         Electric_Range != 0,
+         Base_MSRP != 0) %>%
+  group_by(Tesla) %>%
+  summarise(AVG_Range = mean(Electric_Range),
+            AVG_MSRP =mean(Base_MSRP))
+
+
+
+Median_Range_For_EVs <- clean_df %>%
+  filter(Electric_Vehicle_Type == "Battery Electric Vehicle (BEV)",
+         Electric_Range != 0,
+         Base_MSRP != 0) %>%
+  group_by(Tesla) %>%
+  summarise(Median_Range = median(Electric_Range),
+            Median_MSRP =median(Base_MSRP))
+```
+
+
 ### Trends
 - Tesla vehicle growth over time  
-- BEV vs PHEV adoption trends  
+- BEV vs PHEV adoption trends
+  
+![Revenue](https://raw.githubusercontent.com/iyanusol/Tesla-EV-Market-Analysis-Dashboard/main/images/output-2.png)  
 
 ### Insights
 - Average electric range comparison  
-- Top utility providers supporting Tesla vehicles  
+- Top utility providers supporting Tesla vehicles
 
+### ⚡ EV Insights
+![Insights](https://raw.githubusercontent.com/iyanusol/Tesla-EV-Market-Analysis-Dashboard/main/images/output-4.png)
 ---
 
 ## 🎯 Key Insights
